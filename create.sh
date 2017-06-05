@@ -8,9 +8,38 @@ MEDIA_MOUNT_POINT=/mnt/castle
 DOWNLOAD_MOUNT_POINT=/home/matt/dockerfs/downloads
 # The timezone used by the containers
 TIMEZONE=US/Central
-
+# User Identifiers ($ id [username])
 PUID=1000
 PGID=1000
+# SONARR Variables
+SONARR_BASE_CONTAINER='linuxserver/sonarr'
+SONARR_NAME='mc-sonarr'
+SONARR_CON_PORT=8989
+SONARR_HOST_PORT=8989
+# https://hub.docker.com/r/linuxserver/sonarr/
+declare -a SONARR_OPTS=(
+    "-v /etc/localtime:/etc/localtime:ro"
+    "-v ${MOUNT_POINT}/sonarr-config:/config"
+    "-v ${DOWNLOAD_MOUNT_POINT}/completed:/downloads"
+    #"-v ${MEDIA_MOUNT_POINT}/tv:/tv"
+    "-p ${SONARR_HOST_PORT}:${SONARR_CON_PORT}"
+    "-e PUID=${PUID} -e PGID=${PGID}"
+);
+
+# RADARR Variables
+RADARR_BASE_CONTAINER='linuxserver/radarr'
+RADARR_NAME='mc-radarr'
+RADARR_CON_PORT=7878
+RADARR_HOST_PORT=7878
+# https://hub.docker.com/r/linuxserver/radarr/
+declare -a RADARR_OPTS=(
+    "-v ${MOUNT_POINT}/radarr-config:/config"
+    "-v ${DOWNLOAD_MOUNT_POINT}/completed:/downloads"
+    #"-v ${MEDIA_MOUNT_POINT}/movies:/movies"
+    "-e PGID=${PGID} -e PUID=${PUID}"
+    "-e TZ=${TIMEZONE}"
+    "-p ${RADARR_HOST_PORT}:${RADARR_CON_PORT}"
+);
 
 # ---------- Handlers ----------
 PROGNAME=$(basename $0)
@@ -68,64 +97,17 @@ full_create () {
 	shift 2
 	args=("$@")
 
-	echo "Creating $SONARR_NAME container."
+	printf "Prepping for creation of container [${container}] ${name}\n"
+	printf "Using Options:\n"
+	printf '  %s\n' "${args[@]}"
+
+	full_delete ${name}
+
+	echo "Creating $name container."
 	docker create --name $name ${args[@]} $container > /dev/null || "Error creating container: $?"
 
 	sleep 3;
 	full_start $name
-}
-
-create_sonarr () {
-	# Setup the Sonarr Container
-	# https://hub.docker.com/r/linuxserver/sonarr/
-	# Deprecated into the localtime mount below. -e TZ=<timezone> \
-
-	# SONARR Variables
-	BASE_CONTAINER='linuxserver/sonarr'
-	SONARR_NAME='mc-sonarr'
-	I_PORT=8989
-	S_PORT=8989
-	declare -a S_OPTS=(
-		"-v /etc/localtime:/etc/localtime:ro"
-		"-v $MOUNT_POINT/sonarr-config:/config"
-		"-v $DOWNLOAD_MOUNT_POINT/completed:/downloads"
-		#"-v $MEDIA_MOUNT_POINT/tv:/tv"
-		"-p $I_PORT:$S_PORT"
-		"-e PPUID=$PUID -e PPGID=$PGID"
-	);
-
-	printf "Prepping for creation of container [$BASE_CONTAINER] $SONARR_NAME\n"
-	printf "Using Options:\n"
-	printf '  %s\n' "${S_OPTS[@]}"
-
-	full_delete $SONARR_NAME
-	full_create $SONARR_NAME $BASE_CONTAINER "${S_OPTS[@]}"
-}
-
-create_radarr () {
-	# Setup the Radarr Container
-	# https://hub.docker.com/r/linuxserver/radarr/
-
-	# RADARR Variables
-	BASE_CONTAINER='linuxserver/radarr'
-	RADARR_NAME='mc-radarr'
-	I_PORT=7878
-	S_PORT=7878
-	declare -a S_OPTS=(
-		"-v $MOUNT_POINT/radarr-config:/config"
-		"-v $DOWNLOAD_MOUNT_POINT/completed:/downloads"
-		#"-v $MEDIA_MOUNT_POINT/movies:/movies"
-		"-e PPGID=$PGID -e PPUID=$PUID"
-		"-e TZ=$TIMEZONE"
-		"-p $I_PORT:$S_PORT"
-	);
-	
-	printf "Prepping for creation of container [$BASE_CONTAINER] $RADARR_NAME\n"
-	printf "Using Options:\n"
-	printf '  %s\n' "${S_OPTS[@]}"
-
-	full_delete $RADARR_NAME
-	full_create $RADARR_NAME $BASE_CONTAINER "${S_OPTS[@]}"
 }
 
 create_jackett () {
