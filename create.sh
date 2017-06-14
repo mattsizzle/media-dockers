@@ -3,7 +3,7 @@
 # This mount holds configs related to the services
 MOUNT_POINT=/home/matt/dockerfs
 # This mount point holds media that is shown in plex
-MEDIA_MOUNT_POINT=/mnt/castle
+MEDIA_MOUNT_POINT=/media/matt/video
 # Where download(ing) files from utorrent are stored
 DOWNLOAD_MOUNT_POINT=/home/matt/dockerfs/downloads
 # The timezone used by the containers
@@ -97,14 +97,64 @@ full_create () {
 	shift 2
 	args=("$@")
 
+<<<<<<< Updated upstream
 	printf "Prepping for creation of container [${container}] ${name}\n"
+=======
+	echo "Creating $SONARR_NAME container."
+	docker create --name $name ${args[@]} $container > /dev/null || "Error creating container: $?"
+
+	sleep 3;
+	full_start $name
+}
+
+create_sonarr () {
+	# Setup the Sonarr Container
+	# https://hub.docker.com/r/linuxserver/sonarr/
+	# Deprecated into the localtime mount below. -e TZ=<timezone> \
+
+	# SONARR Variables
+	BASE_CONTAINER='linuxserver/sonarr'
+	SONARR_NAME='mc-sonarr'
+	I_PORT=8989
+	S_PORT=8989
+	declare -a S_OPTS=(
+		"-v /etc/localtime:/etc/localtime:ro"
+		"-v $MOUNT_POINT/sonarr-config:/config"
+		"-v $DOWNLOAD_MOUNT_POINT/completed:/downloads"
+		"-v $MEDIA_MOUNT_POINT/tv:/tv"
+		"-p $I_PORT:$S_PORT"
+		"-e PPUID=$PUID -e PPGID=$PGID"
+	);
+
+	printf "Prepping for creation of container [$BASE_CONTAINER] $SONARR_NAME\n"
+>>>>>>> Stashed changes
 	printf "Using Options:\n"
 	printf '  %s\n' "${args[@]}"
 
 	full_delete ${name}
 
+<<<<<<< Updated upstream
 	echo "Creating $name container."
 	docker create --name $name ${args[@]} $container > /dev/null || "Error creating container: $?"
+=======
+	# RADARR Variables
+	BASE_CONTAINER='linuxserver/radarr'
+	RADARR_NAME='mc-radarr'
+	I_PORT=7878
+	S_PORT=7878
+	declare -a S_OPTS=(
+		"-v $MOUNT_POINT/radarr-config:/config"
+		"-v $DOWNLOAD_MOUNT_POINT/completed:/downloads"
+		"-v $MEDIA_MOUNT_POINT/movies:/movies"
+		"-e PPGID=$PGID -e PPUID=$PUID"
+		"-e TZ=$TIMEZONE"
+		"-p $I_PORT:$S_PORT"
+	);
+	
+	printf "Prepping for creation of container [$BASE_CONTAINER] $RADARR_NAME\n"
+	printf "Using Options:\n"
+	printf '  %s\n' "${S_OPTS[@]}"
+>>>>>>> Stashed changes
 
 	sleep 3;
 	full_start $name
@@ -165,10 +215,10 @@ create_rutorrent () {
 create_all () {
 	printf "Creatomg All Docker Containers\n"
 
-	full_create "mc-jackett"
-	full_create "mc-sonarr"
-	full_create "mc-radarr"
-	full_create "mc-rutorrent"
+	create_jackett
+	create_sonarr
+	create_radarr
+	create_rutorrent
 }
 
 start_all () {
