@@ -8,38 +8,9 @@ MEDIA_MOUNT_POINT=/media/matt/video
 DOWNLOAD_MOUNT_POINT=/home/matt/dockerfs/downloads
 # The timezone used by the containers
 TIMEZONE=US/Central
-# User Identifiers ($ id [username])
+
 PUID=1000
 PGID=1000
-# SONARR Variables
-SONARR_BASE_CONTAINER='linuxserver/sonarr'
-SONARR_NAME='mc-sonarr'
-SONARR_CON_PORT=8989
-SONARR_HOST_PORT=8989
-# https://hub.docker.com/r/linuxserver/sonarr/
-declare -a SONARR_OPTS=(
-    "-v /etc/localtime:/etc/localtime:ro"
-    "-v ${MOUNT_POINT}/sonarr-config:/config"
-    "-v ${DOWNLOAD_MOUNT_POINT}/completed:/downloads"
-    #"-v ${MEDIA_MOUNT_POINT}/tv:/tv"
-    "-p ${SONARR_HOST_PORT}:${SONARR_CON_PORT}"
-    "-e PUID=${PUID} -e PGID=${PGID}"
-);
-
-# RADARR Variables
-RADARR_BASE_CONTAINER='linuxserver/radarr'
-RADARR_NAME='mc-radarr'
-RADARR_CON_PORT=7878
-RADARR_HOST_PORT=7878
-# https://hub.docker.com/r/linuxserver/radarr/
-declare -a RADARR_OPTS=(
-    "-v ${MOUNT_POINT}/radarr-config:/config"
-    "-v ${DOWNLOAD_MOUNT_POINT}/completed:/downloads"
-    #"-v ${MEDIA_MOUNT_POINT}/movies:/movies"
-    "-e PGID=${PGID} -e PUID=${PUID}"
-    "-e TZ=${TIMEZONE}"
-    "-p ${RADARR_HOST_PORT}:${RADARR_CON_PORT}"
-);
 
 # ---------- Handlers ----------
 PROGNAME=$(basename $0)
@@ -50,7 +21,7 @@ error_exit () {
 }
 
 d_delete () {
-	docker rm $1 > /dev/null || error_exit "Failed to delete container $1. Delete this container manually with `docker rm -f $1`  Aborting."
+	docker rm -f $1 > /dev/null || error_exit "Failed to delete container $1. Delete this container manually with `docker rm -f $1`  Aborting."
 }
 
 d_running () {
@@ -69,7 +40,8 @@ full_delete () {
 		then
 			echo "Existing $1 container running. Stopping."
 			docker stop $1 > /dev/null ||  error_exit "Failed to stop container $1. Aborting."
-            	fi
+			sleep 3
+        fi
 
 		d_delete $1
 	fi
@@ -82,7 +54,7 @@ full_start () {
 	IP_ADDRESS=$(docker inspect --format '{{ .NetworkSettings.IPAddress }}' $1 || "UNKNOWN")
 
 	echo "Container Started: $1 with IP: $IP_ADDRESS"
-	echo "Conatiner Accessible @: $IP_ADDRESS:$S_PORT"
+	echo "Container Accessible: $1 @ $IP_ADDRESS:$S_PORT"
 }
 
 full_stop () {
@@ -97,10 +69,7 @@ full_create () {
 	shift 2
 	args=("$@")
 
-<<<<<<< Updated upstream
-	printf "Prepping for creation of container [${container}] ${name}\n"
-=======
-	echo "Creating $SONARR_NAME container."
+	echo "Creating $name container."
 	docker create --name $name ${args[@]} $container > /dev/null || "Error creating container: $?"
 
 	sleep 3;
@@ -120,23 +89,24 @@ create_sonarr () {
 	declare -a S_OPTS=(
 		"-v /etc/localtime:/etc/localtime:ro"
 		"-v $MOUNT_POINT/sonarr-config:/config"
-		"-v $DOWNLOAD_MOUNT_POINT/completed:/downloads"
+		"-v $DOWNLOAD_MOUNT_POINT:/downloads"
 		"-v $MEDIA_MOUNT_POINT/tv:/tv"
 		"-p $I_PORT:$S_PORT"
-		"-e PPUID=$PUID -e PPGID=$PGID"
+		"-e PUID=$PUID -e PGID=$PGID"
 	);
 
 	printf "Prepping for creation of container [$BASE_CONTAINER] $SONARR_NAME\n"
->>>>>>> Stashed changes
 	printf "Using Options:\n"
-	printf '  %s\n' "${args[@]}"
+	printf '  %s\n' "${S_OPTS[@]}"
 
-	full_delete ${name}
+	full_delete $SONARR_NAME
+	full_create $SONARR_NAME $BASE_CONTAINER "${S_OPTS[@]}"
+}
 
-<<<<<<< Updated upstream
-	echo "Creating $name container."
-	docker create --name $name ${args[@]} $container > /dev/null || "Error creating container: $?"
-=======
+create_radarr () {
+	# Setup the Radarr Container
+	# https://hub.docker.com/r/linuxserver/radarr/
+
 	# RADARR Variables
 	BASE_CONTAINER='linuxserver/radarr'
 	RADARR_NAME='mc-radarr'
@@ -144,9 +114,9 @@ create_sonarr () {
 	S_PORT=7878
 	declare -a S_OPTS=(
 		"-v $MOUNT_POINT/radarr-config:/config"
-		"-v $DOWNLOAD_MOUNT_POINT/completed:/downloads"
+		"-v $DOWNLOAD_MOUNT_POINT:/downloads"
 		"-v $MEDIA_MOUNT_POINT/movies:/movies"
-		"-e PPGID=$PGID -e PPUID=$PUID"
+		"-e PGID=$PGID -e PUID=$PUID"
 		"-e TZ=$TIMEZONE"
 		"-p $I_PORT:$S_PORT"
 	);
@@ -154,10 +124,9 @@ create_sonarr () {
 	printf "Prepping for creation of container [$BASE_CONTAINER] $RADARR_NAME\n"
 	printf "Using Options:\n"
 	printf '  %s\n' "${S_OPTS[@]}"
->>>>>>> Stashed changes
 
-	sleep 3;
-	full_start $name
+	full_delete $RADARR_NAME
+	full_create $RADARR_NAME $BASE_CONTAINER "${S_OPTS[@]}"
 }
 
 create_jackett () {
@@ -166,50 +135,23 @@ create_jackett () {
 
 	# JACKETT Variables
 	BASE_CONTAINER='linuxserver/jackett'
-	JACKETT_NAME='mc-jackett'
+	CONTAINER_NAME='mc-jackett'
 	I_PORT=9117
 	S_PORT=9117
 	declare -a S_OPTS=(
 		"-v $MOUNT_POINT/jackett-config:/config"
 		"-v $DOWNLOAD_MOUNT_POINT:/downloads"
-		"-e PPGID=$PGID -e PPUID=$PUID"
+		"-e PGID=$PGID -e PUID=$PUID"
 		"-e TZ=$TIMEZONE"
 		"-p $I_PORT:$S_PORT"
 	);
 
-	printf "Prepping for creation of container [$BASE_CONTAINER] $JACKETT_NAME\n"
+	printf "Prepping for creation of container [$BASE_CONTAINER] $CONTAINER_NAME\n"
 	printf "Using Options:\n"
 	printf '  %s\n' "${S_OPTS[@]}"
 
-	full_delete $JACKETT_NAME
-	full_create $JACKETT_NAME $BASE_CONTAINER "${S_OPTS[@]}"
-}
-
-create_rutorrent () {
-	# Setup the Rutorrent Container
-	# https://hub.docker.com/r/linuxserver/rutorrent/
-	# Deprecated into the localtime mount below. -e TZ=<timezone> \
-
-	# RUTORRENT Variables
-	BASE_CONTAINER='linuxserver/rutorrent'
-	RUTORRENT_NAME='mc-rutorrent'
-	I_PORT=80
-	S_PORT=80
-	declare -a S_OPTS=(
-		"-v $MOUNT_POINT/rutorrent-config:/config"
-		"-v $DOWNLOAD_MOUNT_POINT:/downloads"
-		"-e PGID=$PGID -e PUID=$PUID"
-		"-e TZ=$TIMEZONE"
-		"-p $S_PORT:$I_PORT -p 5000:5000"
-		"-p 51413:51413 -p 6881:6881/udp"
-	);
-
-	printf "Prepping for creation of container [$BASE_CONTAINER] $RUTORRENT_NAME\n"
-	printf "Using Options:\n"
-	printf '  %s\n' "${S_OPTS[@]}"
-
-	full_delete $RUTORRENT_NAME
-	full_create $RUTORRENT_NAME $BASE_CONTAINER "${S_OPTS[@]}"
+	full_delete $CONTAINER_NAME
+	full_create $CONTAINER_NAME $BASE_CONTAINER "${S_OPTS[@]}"
 }
 
 create_all () {
@@ -218,7 +160,18 @@ create_all () {
 	create_jackett
 	create_sonarr
 	create_radarr
-	create_rutorrent
+
+	docker create \
+		--restart=always \
+		--name plex    \
+		--net=host \
+		-e PGID=$PGID -e PUID=$PUID \
+		-e TZ=$TIMEZONE \
+		-v $MOUNT_POINT/plex-config:/config \
+		-v $MEDIA_MOUNT_POINT:/data \
+		timhaak/plex
+
+
 }
 
 start_all () {
@@ -227,7 +180,6 @@ start_all () {
 	full_start "mc-jackett"
 	full_start "mc-sonarr"
 	full_start "mc-radarr"
-	full_start "mc-rutorrent"
 }
 
 stop_all () {
@@ -236,7 +188,6 @@ stop_all () {
 	full_stop "mc-jackett"
 	full_stop "mc-sonarr"
 	full_stop "mc-radarr"
-	full_stop "mc-rutorrent"
 }
 
 create_init () {
